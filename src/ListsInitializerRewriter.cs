@@ -9,6 +9,8 @@ namespace RoslynCSharpExtensions
     /// </summary>
     public class ListsInitializerRewriter : SyntaxRewriter
     {
+        //todo add namespace
+        //todo handle empty list
         private readonly SemanticModel semanticModel;
 
         public ListsInitializerRewriter(SemanticModel semanticModel)
@@ -31,6 +33,14 @@ namespace RoslynCSharpExtensions
             return base.VisitElementAccessExpression(node);
         }
 
+        private TypeSymbol GetArgumentType(ExpressionSyntax expression)
+        {
+            var info = semanticModel.GetTypeInfo(expression);
+
+            var resultantType = info.Type;
+            return resultantType;
+        }
+
         private static List<ExpressionSyntax> GetListCollectionInitializerElements(ElementAccessExpressionSyntax node)
         {
             var arguments = node.ArgumentList.Arguments;
@@ -47,7 +57,12 @@ namespace RoslynCSharpExtensions
                 var lessThenBinaryExpression = greaterThenBinaryExpression.ChildNodes().OfType<BinaryExpressionSyntax>().FirstOrDefault();
                 if (lessThenBinaryExpression == null || lessThenBinaryExpression.OperatorToken.Kind != SyntaxKind.LessThanToken)
                     return null;
-                var result = lessThenBinaryExpression.ChildNodes().OfType<ExpressionSyntax>().Single(child => !child.IsMissing);
+                var result = lessThenBinaryExpression.ChildNodes().OfType<ExpressionSyntax>().SingleOrDefault(child => !child.IsMissing);
+                if (result == null)
+                {
+                    //we are dealing with [<>] construct - handling it like usual indexer expression
+                    return null;
+                }
                 return new List<ExpressionSyntax> { result };
             }
             else
@@ -67,12 +82,5 @@ namespace RoslynCSharpExtensions
             }
         }
 
-        private TypeSymbol GetArgumentType(ExpressionSyntax expression)
-        {
-            var info = semanticModel.GetTypeInfo(expression);
-
-            var resultantType = info.Type;
-            return resultantType;
-        }
     }
 }
