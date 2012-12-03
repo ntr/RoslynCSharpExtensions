@@ -9,8 +9,6 @@ namespace RoslynCSharpExtensions
     /// </summary>
     public class ListsInitializerRewriter : SyntaxRewriter
     {
-        //todo add namespace
-        //todo handle empty list
         private readonly SemanticModel semanticModel;
 
         public ListsInitializerRewriter(SemanticModel semanticModel)
@@ -21,14 +19,22 @@ namespace RoslynCSharpExtensions
         public override SyntaxNode VisitElementAccessExpression(ElementAccessExpressionSyntax node)
         {
             var elements = GetListCollectionInitializerElements(node);
-            if (elements != null && elements.Count > 0)
+            if (elements != null)
             {
-                var type = GetArgumentType(elements[0]);
-                var syntaxList = new SeparatedSyntaxList<ExpressionSyntax>();
-                var intializerExpr = Syntax.InitializerExpression(SyntaxKind.CollectionInitializerExpression, syntaxList.Add(elements.ToArray()));
+                if (elements.Count > 0)
+                {
+                    var type = GetArgumentType(elements[0]);
+                    var syntaxList = new SeparatedSyntaxList<ExpressionSyntax>();
+                    var intializerExpr = Syntax.InitializerExpression(SyntaxKind.CollectionInitializerExpression, syntaxList.Add(elements.ToArray()));
 
-                var expr = Syntax.ParseExpression(string.Format("new List<{1}>{0}", intializerExpr, type));
-                return expr;
+                    return Syntax.ParseExpression(string.Format("new System.Collections.Generic.List<{1}>{0}", intializerExpr, type));
+                }
+                else
+                {
+                    //no elements of list - returning empty list of objects
+                    return Syntax.ParseExpression("new System.Collections.Generic.List<Object>()");
+                }
+              
             }
             return base.VisitElementAccessExpression(node);
         }
@@ -60,8 +66,8 @@ namespace RoslynCSharpExtensions
                 var result = lessThenBinaryExpression.ChildNodes().OfType<ExpressionSyntax>().SingleOrDefault(child => !child.IsMissing);
                 if (result == null)
                 {
-                    //we are dealing with [<>] construct - handling it like usual indexer expression
-                    return null;
+                    //we are dealing with [<>] construct - returning empty list
+                    return new List<ExpressionSyntax>();
                 }
                 return new List<ExpressionSyntax> { result };
             }
